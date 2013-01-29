@@ -1,4 +1,4 @@
-#! /bin/echo this file must be sources: .
+#! /bin/echo this file must be sourced: .
 
 function kb_ls() { /usr/bin/ls -1dsqh "$@"; }
 
@@ -115,8 +115,7 @@ function kb_menu() {
 	page=$((sel /lim))
 	((page==pages))&&lastpage=$'\e[7m'||lastpage=
 	echo -n  $'\e[0m'"${lastpage}p$page/$pages"$'\e[m'": $before$prompt"$'\e[47m \e[0m '
-	[[ "$key" != "ESC[C" ]] && rightonce=0
-	[[ $rightonce == 1 ]] && echo -n "$helptext"
+	[[ "$helptext" ]] && echo -n "$helptext" && helptext=
 
 	for ((count = lim *(sel /lim); count < lim +lim *(sel /lim); count++)); do
 		echo -ne '\e[0m'
@@ -131,7 +130,7 @@ function kb_menu() {
 			if [[ "$tempfile" ]]; then
 				if ! [[ "${lslist["$tempfile"]}" ]]; then
 					ls_reform=$(kb_ls "${displayres[$count]}")
-[[ -d "${displayres[$count]}" ]] && ls_reform=$'\e[4m'"----"
+[[ -d "${displayres[$count]}" ]] && ls_reform="▓▓▓▓"
 printf -v "lslist[$tempfile]" '%4s|%s' "${ls_reform%% *}" "${displayres[$count]}"
 				fi
 				echo -n "${lslist["$tempfile"]}"
@@ -142,8 +141,7 @@ printf -v "lslist[$tempfile]" '%4s|%s' "${ls_reform%% *}" "${displayres[$count]}
 		(($sel == $count)) && for ((colcount=0;colcount<cols;colcount++)); do echo -n '          '; done
 	done
 
-	echo -n "$invisible"
-	read -n1 -s key
+	key=$(read -n1 -p "$invisible" -s; echo "$REPLY")
 	[[ $key ]] || key=ENTER
 	#[[ "$key" == ' ' ]] && key=Space
 	if [[ "$key" == $'\e' ]]; then
@@ -174,20 +172,18 @@ printf -v "lslist[$tempfile]" '%4s|%s' "${ls_reform%% *}" "${displayres[$count]}
 		prompt=${prompt%/*/*}/
 	else prompt=../
 	fi;;
-'ESC[C') if [[ "$rightonce" == 0 ]]; then #RIGHT
+'ESC[11~'|'ESCOP') #F1
 if [[ -d "${displayres[$sel]}" ]]; then
 	helptext=$'\e[31m'"$(/usr/bin/ls "${displayres[$sel]}" | wc -l) files: $(/usr/bin/ls "${displayres[$sel]}" | tr '\n' ' ')"
 else
 	helptext=$'\e[31m'$(/usr/bin/ls -hlF --quoting-style=shell-always "${displayres[$sel]}")
 fi
-	rightonce=1
-	else
-	browse=1
-	rightonce=0
+;;
+'ESC[C') browse=1 #RIGHT
 	change=1;
 	prompt=${displayres[$sel]}
 	[[ -d "$prompt" ]] && prompt+=/ || end=1
-	fi;;
+	;;
 'ESC[4~'|'ESC[F'|'ESC[8~'|'ESCOF')	((sel=$total));; #END
 'ESC[1~'|'ESC[H'|'ESC[7~'|'ESCOH')	((sel=0));; #HOME
 'ESC[12~'|'ESCOQ') oldprompt="$prompt" #F2
@@ -226,7 +222,7 @@ $'\x7f'|$'\x08')	change=1; [[ $prompt ]] && prompt=${prompt::-1};; #BACKSPACE
 		for (( count=0; count < $h; count++)); do
 			echo -ne "\e[2K\e[A\r"
 		done
-		echo -ne '\e[2K\r'
+		echo -ne '\e[2K\r\e[m'
 	fi
 	done
 }
@@ -255,26 +251,25 @@ function kb_write_prompt() {
 	escquote=$(echo "$1" | sed 's/[] !@#^&()`"<>\\{};=|'\''	[]/\\&/g')
 	
 	out="$before$nospace$escquote$nospace$dir$appendprompt"
-	lang=$LC_ALL
-	LC_ALL=C
+	lang=$LC_CTYPE
+	LC_CTYPE=C
 	((READLINE_POINT+=${#out} - ${#READFIRST}))
-	LC_ALL=$LC_ALL
+	LC_CTYPE=$lang
 	READLINE_LINE=$out$READLAST
 }
 
 function kb_main() {
-local cmdname extlist appendprompt recursive quotes last before psheight nospace=0 dotglob nocaseglob nullglob globstar READFIRST READLAST lastquote lastpage resetcounter rightonce lastquote lastpage resetcounter rightonce prompt out
+local cmdname extlist appendprompt recursive quotes last before psheight nospace=0 dotglob nocaseglob nullglob globstar READFIRST READLAST lastquote lastpage resetcounter lastquote lastpage resetcounter prompt out
 	local oldbefore browse beforequote cols doubleclear oldprompt out reset invisible
 	nospace=0
 	invisible=$(tput civis) #turn cursor invisible
 	READFIRST="${READLINE_LINE::$READLINE_POINT}"
 	READLAST="${READLINE_LINE:$READLINE_POINT}"
 	psheight=$( echo -ne "$PS1" | wc -l)
-#	((psheight--))
 	cols=$(( $(tput cols) / 10))
 	IFS=$' \t\n'
 
-	# is the line has no words, add a tab.
+	# if the line has no words, add a tab.
 	if [[ "$READFIRST" =~ ^[[:blank:]]*$ ]]; then
 		READLINE_LINE="$READFIRST"$'\t'"$READLAST"
 		((READLINE_POINT++))
@@ -299,6 +294,8 @@ local cmdname extlist appendprompt recursive quotes last before psheight nospace
 		READLINE_LINE=$prompt$READLAST
 		IFS=$' \t\n'
 		echo -ne "\e[${psheight}A\r\e[2K"
+		tput cnorm
+		tput smam
 		return
 
 	#variable=filename on first word.
@@ -360,13 +357,12 @@ local cmdname extlist appendprompt recursive quotes last before psheight nospace
 	if [[ "$before" =~ (setsid|sudo|which|whatis|whereis|\||\(|&|\{|;)\ *$ ]]; then
 		kb_menu command "$last"
 		((nospace==0)) && prompt+=" "
-		lang=$LC_ALL
-		LC_ALL=C
 		((READLINE_POINT+=${#prompt} - ${#last}))
-		LC_ALL=$lang
 		READLINE_LINE=$before$prompt$READLAST
 		IFS=$' \t\n'
 		echo -ne "\e[${psheight}A\r\e[2K"
+		tput smam
+		tput cnorm
 		return
 	fi
 	kb_replace_var

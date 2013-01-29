@@ -1,0 +1,85 @@
+#! /bin/bash
+in=$(cat)
+tput rmam
+tput civis
+IFS=$'\n'
+lim=$(tput lines)
+((lim-=1))
+cols=$(tput cols)
+pb=
+pa=
+display=()
+change=1
+sel=0
+end=0
+
+trap 'stty echo 2>/dev/null; tput cnorm; tput smam; exit' EXIT INT QUIT TERM HUP
+
+while ((end==0)); do
+
+((change==1)) && {
+tempin=$in
+display=(
+  $(for entry in $(echo "$pb$pa" | tr ' ' '\n'); do
+	tempin=$(echo "$tempin" | fgrep -i "$entry")
+    done
+    echo "$tempin" )
+)
+change=0
+sel=0
+}
+
+total=${#display[@]}
+((total < lim)) && h=$total || h=$lim
+pages=$(( total / lim))
+(( total % lim == 0)) && ((pages--))
+
+((sel < 0)) && sel=0
+((sel >= total)) && sel=$((total -1))
+
+page=$((sel / lim))
+((page==pages)) && lastpage=$'\e[7m' || lastpage=$'\e[0m'
+echo -n "${lastpage}p$page/$pages"$'\e[m'": $pb|$pa" >&2
+
+for ((count = lim *(sel / lim); count < lim+ lim*(sel/lim); count++)); do
+[[ $count == $total && $page == 0 ]] && break || echo $'\e[m' >&2
+((sel == count)) && echo -n $'\e[7m' >&2
+echo -n "${display[$count]}" >&2
+((sel==count)) && for ((colcount=0;colcount<cols;colcount++)); do echo -n '          ' >&2; done
+done
+
+read -n1 -s key < /dev/tty
+[[ $key ]] || key=ENTER
+if [[ "$key" == $'\e' ]]; then
+	key=ESC
+	while true; do
+		read -n 1 -t 0.01 -s newk < /dev/tty
+		[[ "$newk" == $'\e' ]] && newk=ESC
+		key=${key}${newk}
+		[[ -z "$newk" || "$newk" =~ [~A-Da-d] ]] && break
+	done
+fi
+
+case "$key" in
+'ESC[A')	((sel--));; #UP
+'ESC[B')	((sel++));; #DOWN
+'ESC[6~')	((sel+=lim));; #PGDN
+'ESC[5~')	((sel-=lim));; #PGUP
+'ESC[4~'|'ESC[F'|'ESC[8~'|'ESCOF')	((sel=$total));; #END
+'ESC[1~'|'ESC[H'|'ESC[7~'|'ESCOH')	((sel=0));; #HOME
+'ESC[D')	pa=${pb: -1}$pa; pb=${pb%?};; #LEFT
+'ESC[C') 	pb=$pb${pa:0:1}; pa=${pa:1};; #RIGHT
+$'\x7f'|$'\x08')	pb=${pb%?};;
+'ENTER')	pb=; pa=${display[$sel]}; end=1;;
+'ESC')		pb=; pa=; end=1;;
+'ESC[12~'|'ESCOQ') end=1;; #F2
+$'\x09'|$'\t')	pb=${display[$sel]}; pa=; change=1;; #TAB
+ESC*)	:;;
+*)	change=1; pb=$pb$key;;
+esac
+for (( count=0; count < $h; count++)); do
+	echo -ne "\e[2K\e[A\r" >&2
+done
+echo -ne '\e[2K\r' >&2
+done
+echo "$pa$pb"
