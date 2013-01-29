@@ -46,13 +46,21 @@ function kb_listcheck() {
 			displayres+=( "$tempfile" )
 			((colorsw++))
 		else
-			badlist+=( "$tempfile" )
+			if [[ "$dirfirst" ]]; then
+				if [[ -d "$tempfile" ]]; then
+					dirlist+=( "$tempfile" )
+				else
+					badlist+=( "$tempfile" )
+				fi
+			else
+				badlist+=( "$tempfile" )
+			fi
 		fi
 	done
 }
 
 function kb_menu() {
-	local end=0 h badlist total colorsw page pages sel=0 count key newk change=1 lim=12 displayres tempfile ls_reform colcount cols prereset
+	local end=0 h badlist total colorsw page pages sel=0 count key newk change=1 lim=12 displayres tempfile ls_reform colcount cols prereset dirlist
 	local -A lslist
 	tput rmam #don't wrap long lines
 	IFS=$'\n'
@@ -74,10 +82,11 @@ function kb_menu() {
 		elif [[ "$1" == file ]]; then
 			colorsw=0
 			badlist=()
+			dirlist=()
 			displayres=()
 			kb_listcheck "$prompt*"
 		fi
-		[[ "$1" == file ]] && colorsw=${#displayres[@]} && displayres+=( "${badlist[@]}" )
+		[[ "$1" == file ]] && colorsw=${#displayres[@]} && displayres+=( "${dirlist[@]}" "${badlist[@]}" )
 		total=${#displayres[@]}
 
 		# on zero results retry without front match
@@ -89,7 +98,7 @@ function kb_menu() {
 				kb_listcheck "*$prompt*"
 			fi
 			colorsw=${#displayres[@]}
-			displayres+=( "${badlist[@]}" )
+			displayres+=( "${dirlist[@]}" "${badlist[@]}" )
 			total=${#displayres[@]}
 		fi
 		((total==1 && browse==0)) && prompt=${displayres[0]} && break
@@ -208,6 +217,11 @@ fi
 	sel=0
 	displayres=( $(/usr/bin/ls -d1qt $prompt/*) )
 	;;
+\+) #plus
+	prompt+=\*
+	nospace=1
+	end=1
+	;;
 'ENTER')	[[ "${displayres[$sel]}" ]] && prompt="${displayres[$sel]}"; end=1;; #ENTER
 'ESC[2~')	appendprompt=\ $prompt; prompt="${displayres[$sel]}"; end=1;; #INSERT
 'ESC')		nospace=1; end=1;; #ESC
@@ -259,7 +273,7 @@ function kb_write_prompt() {
 }
 
 function kb_main() {
-local cmdname extlist appendprompt recursive quotes last before psheight nospace=0 dotglob nocaseglob nullglob globstar READFIRST READLAST lastquote lastpage resetcounter lastquote lastpage resetcounter prompt out
+local cmdname extlist appendprompt recursive quotes last before psheight nospace=0 dotglob nocaseglob nullglob globstar READFIRST READLAST lastquote lastpage resetcounter lastquote lastpage resetcounter prompt out dirfirst=$1
 	local oldbefore browse beforequote cols doubleclear oldprompt out reset invisible
 	nospace=0
 	invisible=$(tput civis) #turn cursor invisible
@@ -382,3 +396,5 @@ local cmdname extlist appendprompt recursive quotes last before psheight nospace
 	tput cnorm
 }
 bind -x '"\t":kb_main'
+#use this to group directories first
+#bind -x '"\t":kb_main dirfirst'
