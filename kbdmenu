@@ -1,7 +1,7 @@
 #! /bin/bash
 in=$(cat)
-tput rmam
-tput civis
+tput rmam > /dev/tty
+tput civis >/dev/tty
 IFS=$'\n'
 lim=$(tput lines)
 ((lim-=1))
@@ -13,7 +13,7 @@ change=1
 sel=0
 end=0
 
-trap 'stty echo 2>/dev/null; tput cnorm; tput smam; exit' EXIT INT QUIT TERM HUP
+trap 'stty echo >/dev/tty; tput cnorm >/dev/tty; tput smam >/dev/tty; exit' EXIT INT QUIT TERM HUP
 
 while ((end==0)); do
 
@@ -69,12 +69,12 @@ case "$key" in
 'ESC[1~'|'ESC[H'|'ESC[7~'|'ESCOH')	((sel=0));; #HOME
 'ESC[D')	pa=${pb: -1}$pa; pb=${pb%?};; #LEFT
 'ESC[C') 	pb=$pb${pa:0:1}; pa=${pa:1};; #RIGHT
-$'\x7f'|$'\x08')	pb=${pb%?};;
+$'\x7f'|$'\x08')	pb=${pb%?}; change=1;; #backspace
 'ENTER')	pb=; pa=${display[$sel]}; end=1;;
-'ESC')		pb=; pa=; end=1;;
+'ESC')		pb=; pa=; end=1;; #ESC
 'ESC[12~'|'ESCOQ') end=1;; #F2
 $'\x09'|$'\t')	pb=${display[$sel]}; pa=; change=1;; #TAB
-ESC*)	:;;
+ESC*)	:;; #other special keys
 *)	change=1; pb=$pb$key;;
 esac
 for (( count=0; count < $h; count++)); do
