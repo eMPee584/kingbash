@@ -217,7 +217,7 @@ fi
 	sel=0
 	displayres=( $(/usr/bin/ls -d1qt $prompt/*) )
 	;;
-\+) #plus
+\+) #Plus (All)
 	prompt+=\*
 	nospace=1
 	end=1
@@ -244,11 +244,11 @@ function kb_replace_var() {
 	local var fill
 	OIFS=$IFS
 	IFS=$'\n'
-	last="${last/\~/$HOME}"
+	[[ "${last//[^~]}" ]] && last="${last/\~/$HOME}" && replaceback[$HOME]='~'
 	[[ "${last//[^$]}" ]] && \
 	for var in $(echo "$last" | /usr/bin/grep -o '\$[a-zA-Z_][a-zA-Z0-9_]*' | tr -d '$'); do
 		fill=${!var}
-		[[ $fill ]] && last="${last/\$$var/$fill}"
+		[[ $fill ]] && last="${last/\$$var/$fill}" && replaceback["$fill"]=\$$var
 	done
 	IFS=$OIFS
 }
@@ -263,7 +263,10 @@ function kb_write_prompt() {
 	#escape
 	(( nospace == 1 )) && dir=; nospace=
 	escquote=$(echo "$1" | sed 's/[] !@#^&()`"<>\\{};=|'\''	[]/\\&/g')
-	
+	for fill in ${!replaceback[@]}; do
+		var=${replaceback["$fill"]}
+		escquote=${escquote/$fill/$var}
+	done
 	out="$before$nospace$escquote$nospace$dir$appendprompt"
 	lang=$LC_CTYPE
 	LC_CTYPE=C
@@ -275,6 +278,7 @@ function kb_write_prompt() {
 function kb_main() {
 local cmdname extlist appendprompt recursive quotes last before psheight nospace=0 dotglob nocaseglob nullglob globstar READFIRST READLAST lastquote lastpage resetcounter lastquote lastpage resetcounter prompt out dirfirst=$1
 	local oldbefore browse beforequote cols doubleclear oldprompt out reset invisible
+	local -A replaceback
 	nospace=0
 	invisible=$(tput civis) #turn cursor invisible
 	READFIRST="${READLINE_LINE::$READLINE_POINT}"

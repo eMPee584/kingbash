@@ -70,6 +70,7 @@ case "$key" in
 'ESC[D')	pa=${pb: -1}$pa; pb=${pb%?};; #LEFT
 'ESC[C') 	pb=$pb${pa:0:1}; pa=${pa:1};; #RIGHT
 $'\x7f'|$'\x08')	pb=${pb%?}; change=1;; #backspace
+'ESC[3~')	pa=${pa:1}; change=1;; #delete
 'ENTER')
 if (( "${#display[$sel]}" > 1)); then
 pb=; pa=${display[$sel]}; end=1
