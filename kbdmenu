@@ -1,7 +1,7 @@
 #! /bin/bash
 in=$(cat)
-tput rmam > /dev/tty
-tput civis >/dev/tty
+tput rmam >&2
+tput civis >&2
 IFS=$'\n'
 lim=$(tput lines)
 ((lim-=1))
@@ -13,7 +13,7 @@ change=1
 sel=0
 end=0
 
-trap 'stty echo >/dev/tty; tput cnorm >/dev/tty; tput smam >/dev/tty; exit' EXIT INT QUIT TERM HUP
+trap 'tput cnorm >&2; tput smam >&2; exit' EXIT INT QUIT TERM HUP
 
 while ((end==0)); do
 
@@ -70,7 +70,13 @@ case "$key" in
 'ESC[D')	pa=${pb: -1}$pa; pb=${pb%?};; #LEFT
 'ESC[C') 	pb=$pb${pa:0:1}; pa=${pa:1};; #RIGHT
 $'\x7f'|$'\x08')	pb=${pb%?}; change=1;; #backspace
-'ENTER')	pb=; pa=${display[$sel]}; end=1;;
+'ENTER')
+if (( "${#display[$sel]}" > 1)); then
+pb=; pa=${display[$sel]}; end=1
+else
+end=1
+fi
+;;
 'ESC')		pb=; pa=; end=1;; #ESC
 'ESC[12~'|'ESCOQ') end=1;; #F2
 $'\x09'|$'\t')	pb=${display[$sel]}; pa=; change=1;; #TAB
