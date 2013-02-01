@@ -311,7 +311,8 @@ local cmdname extlist appendprompt recursive quotes last before psheight nospace
 		((READLINE_POINT+=${#prompt} - ${#READFIRST}))
 		READLINE_LINE=$prompt$READLAST
 		IFS=$' \t\n'
-		echo -ne "\e[${psheight}A\r\e[2K"
+		((psheight > 0)) && echo -ne "\e[${psheight}A"
+		echo -ne '\r\e[2K'
 		tput cnorm
 		tput smam
 		return
@@ -378,7 +379,8 @@ local cmdname extlist appendprompt recursive quotes last before psheight nospace
 		((READLINE_POINT+=${#prompt} - ${#last}))
 		READLINE_LINE=$before$prompt$READLAST
 		IFS=$' \t\n'
-		echo -ne "\e[${psheight}A\r\e[2K"
+		((psheight > 1)) && echo -ne "\e[${psheight}A"
+		echo -ne "\r\e[2K"
 		tput smam
 		tput cnorm
 		return
@@ -395,7 +397,8 @@ local cmdname extlist appendprompt recursive quotes last before psheight nospace
 	[[ $dotglob ]] || shopt -u dotglob
 	[[ $globstar ]] || shopt -s globstar
 
-	echo -ne "\r\e[2K\e[${psheight}A\r\e[2K"
+	((psheight > 0)) && echo -ne "\r\e[2K\e[${psheight}A"
+	echo -ne "\r\e[2K"
 	tput smam
 	tput cnorm
 }
