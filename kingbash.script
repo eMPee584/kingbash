@@ -20,7 +20,7 @@ extlist='jpg|jpeg|png|gif|bmp|icon?|tiff?' ;;
 sdlmame|openmsx|msxplay|zsnes|desmume|VirtualBoy)
 extlist='rom|dsk' ;;
 #Wine
-wine|winewrap|wineconsole)
+wine|winewrap|wineme|winenew|wineconsole)
 extlist='exe|com|bat' ;;
 #Archives
 atool|x|xi|gunzip|extract|unzip|unrar|zip|rar|7z|mcomix|v)
@@ -60,7 +60,8 @@ function kb_listcheck() {
 }
 
 function kb_menu() {
-	local end=0 h badlist total colorsw page pages sel=0 count key newk change=1 lim=12 displayres tempfile ls_reform colcount cols prereset dirlist
+	local end=0 h badlist total colorsw page pages sel=0 count key newk change=1
+	local lim=12 displayres tempfile ls_reform colcount cols prereset dirlist
 	local -A lslist
 	tput rmam #don't wrap long lines
 	IFS=$'\n'
@@ -109,6 +110,8 @@ function kb_menu() {
 	fi
 	((sel < 0)) && sel=0
 	((sel >= total)) && sel=$((total -1))
+
+	# With F2 and Left, the selected file does not start at 0
 	if [[ "$reset" ]]; then
 	for tempfile in "${displayres[@]}"; do
 		if [[ "${tempfile##*/}" == "${reset##*/}" ]]; then
@@ -129,18 +132,32 @@ function kb_menu() {
 	for ((count = lim *(sel /lim); count < lim +lim *(sel /lim); count++)); do
 		echo -ne '\e[0m'
 		[[ $count == $total && $page == 0 ]] && break || echo
+
+# The selected file has a X before it
 #		(($sel == $count)) && echo -n "X "$'\e[7m' || echo -n "  "
+
+# The selected file is reverse colored
 		(($sel == $count)) && echo -n $'\e[7m'
+
+# Media files that match the command were counted and now highlighted
 		((count < colorsw)) && echo -ne '\e[1;34m'
+
 		if [[ "$1" == file ]]; then
+
+# Some characters can give errors when a list subscript
 			tempfile=${displayres[$count]//\'}
 			tempfile=${tempfile//[}
 			tempfile=${tempfile//]}
+
 			if [[ "$tempfile" ]]; then
 				if ! [[ "${lslist["$tempfile"]}" ]]; then
+
+# Get filesize, or special characters for dirs
+# Store results in lslist, so they don't have to be acquired twice
 					ls_reform=$(kb_ls "${displayres[$count]}")
 [[ -d "${displayres[$count]}" ]] && ls_reform="▓▓▓▓"
 printf -v "lslist[$tempfile]" '%4s|%s' "${ls_reform%% *}" "${displayres[$count]}"
+
 				fi
 				echo -n "${lslist["$tempfile"]}"
 			fi
@@ -162,12 +179,17 @@ printf -v "lslist[$tempfile]" '%4s|%s' "${ls_reform%% *}" "${displayres[$count]}
 			[[ -z "$newk" || "$newk" =~ [~A-Da-d] ]] && break
 		done
 	fi
-	case "$key" in
-'ESC[A')	((sel--));; #UP
-'ESC[B')	((sel++));; #DOWN
-'ESC[6~')	((sel+=lim));; #PGDN
-'ESC[5~')	((sel-=lim));; #PGUP
-'ESC[D')	change=1; #LEFT
+case "$key" in
+'ESC[A') #UP
+	((sel--));;
+'ESC[B') #DOWN
+	((sel++));;
+'ESC[6~') #PGDN
+	((sel+=lim));;
+'ESC[5~') #PGUP
+	((sel-=lim));;
+'ESC[D') #LEFT
+	change=1
 	browse=1
 	reset=${prompt%/*}
 	reset=$(cd "$reset" 2>/dev/null; pwd -L | sed 's_^.*/__')
@@ -180,22 +202,27 @@ printf -v "lslist[$tempfile]" '%4s|%s' "${ls_reform%% *}" "${displayres[$count]}
 		! [[ ${prompt: -1} == / ]] && prompt=${prompt%/*}/
 		prompt=${prompt%/*/*}/
 	else prompt=../
-	fi;;
+	fi
+	;;
 'ESC[11~'|'ESCOP') #F1
-if [[ -d "${displayres[$sel]}" ]]; then
-	helptext=$'\e[31m'"$(/usr/bin/ls "${displayres[$sel]}" | wc -l) files: $(/usr/bin/ls "${displayres[$sel]}" | tr '\n' ' ')"
-else
-	helptext=$'\e[31m'$(/usr/bin/ls -hlF --quoting-style=shell-always "${displayres[$sel]}")
-fi
-;;
-'ESC[C') browse=1 #RIGHT
-	change=1;
+	if [[ -d "${displayres[$sel]}" ]]; then
+		helptext=$'\e[31m'"$(/usr/bin/ls "${displayres[$sel]}" | wc -l) files: $(/usr/bin/ls "${displayres[$sel]}" | tr '\n' ' ')"
+	else
+		helptext=$'\e[31m'$(/usr/bin/ls -hlF --quoting-style=shell-always "${displayres[$sel]}")
+	fi
+	;;
+'ESC[C') #RIGHT
+	browse=1 
+	change=1
 	prompt=${displayres[$sel]}
 	[[ -d "$prompt" ]] && prompt+=/ || end=1
 	;;
-'ESC[4~'|'ESC[F'|'ESC[8~'|'ESCOF')	((sel=$total));; #END
-'ESC[1~'|'ESC[H'|'ESC[7~'|'ESCOH')	((sel=0));; #HOME
-'ESC[12~'|'ESCOQ') oldprompt="$prompt" #F2
+'ESC[4~'|'ESC[F'|'ESC[8~'|'ESCOF') #END
+	((sel=$total));; 
+'ESC[1~'|'ESC[H'|'ESC[7~'|'ESCOH') #HOME
+	((sel=0));; 
+'ESC[12~'|'ESCOQ') #F2
+	oldprompt="$prompt" 
 	oldbefore=$before
 	prereset=${displayres[$sel]}
 	before="Enter new command: "
@@ -212,23 +239,42 @@ fi
 	prompt=$oldprompt
 	reset=$prereset
 	;;
-'ESC[13~'|'ESCOR') prompt=$(echo "$prompt" | sed 's/[^/]*$//') #F3
+'ESC[13~'|'ESCOR') #F3
+	prompt=$(echo "$prompt" | sed 's/[^/]*$//') 
 	[[ "$prompt" ]] || prompt=.
 	sel=0
 	displayres=( $(/usr/bin/ls -d1qt $prompt/*) )
 	;;
 \+) #Plus (All)
-	prompt+=\*
-	nospace=1
+	prompt=
+	for tempfile in "${displayres[@]}"; do
+		kb_write_prompt "$tempfile" before
+	done
 	end=1
 	;;
-'ENTER')	[[ "${displayres[$sel]}" ]] && prompt="${displayres[$sel]}"; end=1;; #ENTER
-'ESC[2~')	appendprompt=\ $prompt; prompt="${displayres[$sel]}"; end=1;; #INSERT
-'ESC')		nospace=1; end=1;; #ESC
-$'\x7f'|$'\x08')	change=1; [[ $prompt ]] && prompt=${prompt::-1};; #BACKSPACE
-'ESC'*) :;; #UNUSED KEY
-*) change=1; prompt+=$key;;
-	esac
+'ENTER') #ENTER
+	[[ "${displayres[$sel]}" ]] && prompt="${displayres[$sel]}"
+	end=1
+	;; 
+'ESC[2~') #INSERT
+	kb_write_prompt "${displayres[$sel]}" before
+	((sel++))
+	;;
+'ESC') #ESC
+	nospace=1
+	end=1
+	;; 
+$'\x7f'|$'\x08') #BACKSPACE
+	change=1
+	[[ $prompt ]] && prompt=${prompt::-1}
+	;; 
+'ESC'*) #UNUSED KEY
+	: ;; 
+*) #Normal key
+	change=1
+	prompt+=$key
+	;; 
+esac
 	
 	if [[ $doubleclear ]]; then
 		doubleclear=
@@ -240,6 +286,7 @@ $'\x7f'|$'\x08')	change=1; [[ $prompt ]] && prompt=${prompt::-1};; #BACKSPACE
 	fi
 	done
 }
+
 function kb_replace_var() {
 	local var fill
 	OIFS=$IFS
@@ -252,6 +299,7 @@ function kb_replace_var() {
 	done
 	IFS=$OIFS
 }
+
 function kb_write_prompt() {
 	local out escquote lang
 	IFS=$' \t\n'
@@ -261,13 +309,15 @@ function kb_write_prompt() {
 #	[[ $1 ]] || { nospace=; dir=; }
 #	escquote=${1//\'/\'\\\'\'}
 	#escape
-	(( nospace == 1 )) && dir=; nospace=
+	(( nospace == 1 )) && dir=
+	nospace=
 	escquote=$(echo "$1" | sed 's/[] !@#^&()`"<>\\{};=|'\''	[]/\\&/g')
 	for fill in ${!replaceback[@]}; do
 		var=${replaceback["$fill"]}
 		escquote=${escquote/$fill/$var}
 	done
-	out="$before$nospace$escquote$nospace$dir$appendprompt"
+	[[ "$2" == before ]] && before+="$escquote$dir" && return
+	out="$before$nospace$escquote$nospace$dir"
 	lang=$LC_CTYPE
 	LC_CTYPE=C
 	((READLINE_POINT+=${#out} - ${#READFIRST}))
@@ -276,8 +326,10 @@ function kb_write_prompt() {
 }
 
 function kb_main() {
-local cmdname extlist appendprompt recursive quotes last before psheight nospace=0 dotglob nocaseglob nullglob globstar READFIRST READLAST lastquote lastpage resetcounter lastquote lastpage resetcounter prompt out dirfirst=$1
-	local oldbefore browse beforequote cols doubleclear oldprompt out reset invisible
+	local cmdname extlist recursive quotes last before psheight nospace=0
+	local dotglob nocaseglob nullglob globstar READFIRST READLAST lastpage
+	local resetcounter lastquote lastpage resetcounter prompt out dirfirst=$1
+	local oldbefore browse beforequote cols doubleclear oldprompt reset invisible
 	local -A replaceback
 	nospace=0
 	invisible=$(tput civis) #turn cursor invisible
@@ -387,6 +439,9 @@ local cmdname extlist appendprompt recursive quotes last before psheight nospace
 	fi
 	kb_replace_var
 
+	# In the case of completion on 'file.t<tab>
+	# the ' must be removed to scan the file.
+	# Completing after typing a ' is then not supported.
 	last=${last//\'}
 
 	kb_menu 'file' "$last"
