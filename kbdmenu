@@ -2,11 +2,13 @@
 in=$(cat)
 tput rmam >&2
 tput civis >&2
+Blockon=$'\e[30;47m'
+Blockoff=$'\e[m'
 IFS=$'\n'
 lim=$(tput lines)
 ((lim-=1))
 cols=$(tput cols)
-pb=
+pb=$1
 pa=
 display=()
 change=1
@@ -39,11 +41,11 @@ pages=$(( total / lim))
 
 page=$((sel / lim))
 ((page==pages)) && lastpage=$'\e[7m' || lastpage=$'\e[0m'
-echo -n "${lastpage}p$page/$pages"$'\e[m'": $pb|$pa" >&2
+echo -n "${lastpage}p$page/$pages"$'\e[m'": $pb$Blockon${pa:0:1}$(! [[ $pa ]] && echo -n ' ')$Blockoff${pa:1}" >&2
 
 for ((count = lim *(sel / lim); count < lim+ lim*(sel/lim); count++)); do
 [[ $count == $total && $page == 0 ]] && break || echo $'\e[m' >&2
-((sel == count)) && echo -n $'\e[7m' >&2
+((sel == count)) && echo -n $'\e[46;30m' >&2
 echo -n "${display[$count]}" >&2
 ((sel==count)) && for ((colcount=0;colcount<cols;colcount++)); do echo -n '          ' >&2; done
 done
