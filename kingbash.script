@@ -355,7 +355,7 @@ function kb_main() {
 	local dotglob nocaseglob nullglob globstar READFIRST READLAST lastpage
 	local resetcounter lastquote lastpage resetcounter prompt out dirfirst nohelp
 	local oldbefore browse beforequote cols doubleclear oldprompt reset invisible
-	local fill var dircmd key
+	local fill var dircmd key oldrecursive
 	local -A replaceback
 	nospace=0
 	invisible=$(tput civis) #turn cursor invisible
@@ -398,6 +398,9 @@ function kb_main() {
 	quotes=${READFIRST//\\\'}
 	quotes=${quotes//[^\']}
 	quotes=${#quotes}
+
+	# cannot use the last escape
+	[[ "${READFIRST: -1}" == '\' ]] && READFIRST=${READFIRST%\\} && ((READLINE_POINT--))
 
 	# the last word is empty, start completing from scratch
 	if [[ "${READFIRST: -1}" == ' ' && "${READFIRST: -2:1}" != '\' ]] && (( quotes % 2 == 0)); then
@@ -442,7 +445,23 @@ function kb_main() {
 	while [[ -z "$before" ]] ; do
 		if [[ "${recursive: -1}" == '\' ]]; then
 			last="${recursive##* } $last"
+			oldrecursive=$recursive
 			recursive=${recursive% *}
+			
+			# if this didn't work, then there was an error in recursion
+			# this will happen if there are no separate spaces e.g.
+			# there is no command, but there is a "\ "
+			# command\ filename
+			# but seems to be triggerable by race conditions too
+			if [[ "$oldrecursive" == "$recursive" ]]; then
+				sleep 0.01
+				recursive=${recursive% *}
+				if [[ "$oldrecursive" == "$recursive" ]]; then
+					echo 'unable to interpret'
+					echo
+					return
+				fi
+			fi
 		else
 			before=$recursive\ 
 		fi
@@ -508,10 +527,10 @@ function kb_main() {
 	tput smam
 	tput cnorm
 }
-bind -x '"\t":kb_main'
+#bind -x '"\t":kb_main'
 #use this (like in ~/.bashrc after sourcing this file) to group directories first
 #bind -x '"\t":kb_main dirfirst'
 #use this to NOT show help
-#bind -x '"\t":kb_main nohelp'
+bind -x '"\t":kb_main nohelp'
 #Combined
 #bind -x '"\t":kb_main dirfirst nohelp'
