@@ -1,4 +1,17 @@
-#! /bin/echo this file must be sourced: .
+#! /bin/bash
+# https://bbs.archlinux.org/viewtopic.php?pid=1244804#p1244804
+# Usage:
+# bind -x '"\t":out=$(kingbash.script "$PS1" "$(compgen -A alias -A function)" nohelp); READLINE_LINE=$(echo "$out" | head -n -1); READLINE_POINT=$(echo "$out" | tail -n 1)'
+#
+# Usage Explanation
+# main command: bind -x '"KEY":COMMAND'
+# KEY of \t means tab.
+# COMMAND sets the two $READLINE variables from kingbash.script.
+# kingbash.script needs 2, 3 or 4 arguments:
+# $1 is $PS1 to see how many lines have to be moved up.
+# $2 is a list of aliases and functions used for command completion generated with compgen.
+# $3 and $4 are optionally one of nohelp or dirfirst
+# nohelp removes the helpbar and dirfirst lists directories first always.
 
 function kb_ls() { /usr/bin/ls -1dsqh "$@"; }
 
@@ -62,10 +75,12 @@ function kb_listcheck() {
 }
 
 function kb_menu() {
-	local end=0 h badlist total colorsw page pages sel=0 count key newk change=1
-	local lim=12 displayres tempfile ls_reform colcount cols prereset dirlist path
-	local -A lslist
-	tput rmam #don't wrap long lines
+	end=0
+	sel=0
+	change=1
+	lim=12
+	declare -A lslist
+	tput rmam >&2 #don't wrap long lines
 	IFS=$'\n'
 	prompt="$2"
 
@@ -81,8 +96,8 @@ function kb_menu() {
 		resetcounter=0
 		change=0
 		if [[ "$1" == command ]]; then
-			[[ $prompt ]] || { read -sn1 -p "Enter first letter" prompt; echo -ne '\e[2K\r'; }
-			displayres=( $(compgen -A command -A alias -A builtin -A function $prompt | sort -u) )
+			[[ $prompt ]] || { read -sn1 -p "Enter first letter" prompt; echo -ne '\e[2K\r' >&2; }
+			displayres=( $( { compgen -A command -A alias -A builtin -A function $prompt; echo "$customcmd" | grep "^$prompt"; } | sort -u) )
 			kb_listcheck "$prompt*" executables
 		elif [[ "$1" == file ]]; then
 			colorsw=0
@@ -132,21 +147,21 @@ function kb_menu() {
 	page=$((sel /lim))
 	((page==pages))&&lastpage=$'\e[7m'||lastpage=
 	((pages==-1))&&lastpage=$'\e[41m'
-	echo -n  $'\e[0m'"${lastpage}p$page/$pages"$'\e[m'": $before$prompt"$'\e[47m \e[0m '
-	[[ "$helptext" ]] && echo -n "$helptext" && helptext=
+	echo -n  $'\e[0m'"${lastpage}p$page/$pages"$'\e[m'": $before$prompt"$'\e[47m \e[0m ' >&2
+	[[ "$helptext" ]] && echo -n "$helptext" >&2 && helptext=
 
 	for ((count = lim *(sel /lim); count < lim +lim *(sel /lim); count++)); do
-		echo -ne '\e[0m'
-		[[ $count == $total && $page == 0 ]] && break || echo
+		echo -ne '\e[0m' >&2
+		[[ $count == $total && $page == 0 ]] && break || echo >&2
 
 # The selected file has a X before it
-#		(($sel == $count)) && echo -n "X "$'\e[7m' || echo -n "  "
+#		(($sel == $count)) && echo -n "X "$'\e[7m' || echo -n "  " >&2
 
 # The selected file is reverse colored
-		(($sel == $count)) && echo -n $'\e[7m'
+		(($sel == $count)) && echo -n $'\e[7m' >&2
 
 # Media files that match the command were counted and now highlighted
-		((count < colorsw)) && echo -ne '\e[1;34m'
+		((count < colorsw)) && echo -ne '\e[1;34m' >&2
 
 		if [[ "$1" == file ]]; then
 
@@ -168,19 +183,19 @@ function kb_menu() {
 printf -v "lslist[$tempfile]" '%4s|%s' "${ls_reform%% *}" "${displayres[$count]}"
 
 				fi
-				echo -n "${lslist["$tempfile"]}"
+				echo -n "${lslist["$tempfile"]}" >&2
 			fi
 		else
-			echo -n "${displayres[$count]}"
+			echo -n "${displayres[$count]}" >&2
 		fi
-		(($sel == $count)) && for ((colcount=0;colcount<cols;colcount++)); do echo -n '          '; done
+		(($sel == $count)) && for ((colcount=0;colcount<cols;colcount++)); do echo -n '          ' >&2; done
 	done
 	if (( $nohelp == 1 )); then
-		echo -e '\e[0m'
+		echo -e '\e[0m' >&2
 		for item in F1:info F2:command F3:time Left:updir Right:browse Insert:Add\&continue Plus:Add\ all; do
-			echo -ne "\e[40;31m${item/:/\\e[30;41m}\e[m "
+			echo -ne "\e[40;31m${item/:/\\e[30;41m}\e[m " >&2
 		done
-		echo -ne "\e[0m"
+		echo -ne "\e[0m" >&2
 	fi
 
 	key=$(read -n1 -p "$invisible" -s; echo "$REPLY")
@@ -243,9 +258,9 @@ case "$key" in
 	prereset=${displayres[$sel]}
 	before="Enter new command: "
 	for (( count=0; count < $h; count++)); do
-		echo -ne "\e[2K\e[A\r"
+		echo -ne "\e[2K\e[A\r" >&2
 	done
-	echo -ne '\e[2K\r'
+	echo -ne '\e[2K\r' >&2
 	kb_menu command ""
 	doubleclear=1
 	change=1
@@ -253,6 +268,7 @@ case "$key" in
 	cmdname=$prompt
 	[[ "$cmdname" =~ ^(c|cd|popd|rmdir)$ ]] && dircmd=1
 	kb_highlight
+	end=0
 	before=$cmdname\ ${oldbefore#* }
 	prompt=$oldprompt
 	reset=$prereset
@@ -305,9 +321,9 @@ esac
 		doubleclear=
 	else
 		for (( count=0; count < h + nohelp; count++)); do
-			echo -ne "\e[2K\e[A\r"
+			echo -ne "\e[2K\e[A\r" >&2
 		done
-		echo -ne '\e[2K\r\e[m'
+		echo -ne '\e[2K\r\e[m' >&2
 	fi
 	done
 }
@@ -350,18 +366,23 @@ function kb_write_prompt() {
 	READLINE_LINE=$out$READLAST
 }
 
-function kb_main() {
-	local cmdname extlist recursive quotes last before psheight nospace=0
-	local dotglob nocaseglob nullglob globstar READFIRST READLAST lastpage
-	local resetcounter lastquote lastpage resetcounter prompt out dirfirst nohelp
-	local oldbefore browse beforequote cols doubleclear oldprompt reset invisible
-	local fill var dircmd key oldrecursive
-	local -A replaceback
+function kb_output() {
+	echo "$READLINE_LINE"
+	echo "$READLINE_POINT"
+}
+
+trap 'echo -n $'\r' >&2; tput smam >&2; tput cnorm >&2; kb_output; exit' EXIT
+trap 'echo -n $'\r' >&2; tput smam >&2; tput cnorm >&2; exit' INT QUIT TERM HUP
+
+#function kb_main() {
+	nospace=0
+	declare -A replaceback
 	nospace=0
 	invisible=$(tput civis) #turn cursor invisible
 	READFIRST="${READLINE_LINE::$READLINE_POINT}"
 	READLAST="${READLINE_LINE:$READLINE_POINT}"
-	psheight=$( echo -ne "$PS1" | wc -l)
+	psheight=$( echo -ne "$1" | wc -l); shift
+	customcmd=$1; shift
 	cols=$(( $(tput cols) / 10))
 	IFS=$' \t\n'
 	[[ $1 == dirfirst ]] && dirfirst=1
@@ -378,21 +399,17 @@ function kb_main() {
 			IFS=$' \t\n'
 			READLINE_LINE="$READFIRST"$'\t'"$key$READLAST"
 			((READLINE_POINT+=${#key} +1))
-			((psheight > 0)) && echo -ne "\e[${psheight}A"
-			return
+			((psheight > 0)) && echo -ne "\e[${psheight}A" >&2
+			exit
 		fi
 		# put cursor at beginning of line to fill in a command later
 		READLINE_POINT=-999
 	fi
 
-	nocaseglob=$(shopt nocaseglob | /usr/bin/grep -F on)
-	[[ $nocaseglob ]] || shopt -s nocaseglob
-	nullglob=$(shopt nullglob | /usr/bin/grep -F on)
-	[[ $nullglob ]] || shopt -s nullglob
-	dotglob=$(shopt dotglob | /usr/bin/grep -F on)
-	[[ $dotglob ]] || shopt -s dotglob
-	globstar=$(shopt globstar | /usr/bin/grep -F off)
-	[[ $globstar ]] || shopt -u globstar
+	shopt -s nocaseglob
+	shopt -s nullglob
+	shopt -s dotglob
+	shopt -u globstar
 
 	# count non-escaped quotes
 	quotes=${READFIRST//\\\'}
@@ -420,11 +437,9 @@ function kb_main() {
 		((READLINE_POINT+=${#prompt} - ${#READFIRST}))
 		READLINE_LINE=$prompt$READLAST
 		IFS=$' \t\n'
-		((psheight > 0)) && echo -ne "\e[${psheight}A"
-		echo -ne '\r\e[2K'
-		tput cnorm
-		tput smam
-		return
+		((psheight > 0)) && echo -ne "\e[${psheight}A" >&2
+		echo -ne '\r\e[2K' >&2
+		exit
 
 	#variable=filename on first word.
 	elif ! [[ "$READFIRST" =~ \  ]]; then
@@ -447,21 +462,6 @@ function kb_main() {
 			last="${recursive##* } $last"
 			oldrecursive=$recursive
 			recursive=${recursive% *}
-			
-			# if this didn't work, then there was an error in recursion
-			# this will happen if there are no separate spaces e.g.
-			# there is no command, but there is a "\ "
-			# command\ filename
-			# but seems to be triggerable by race conditions too
-			if [[ "$oldrecursive" == "$recursive" ]]; then
-				sleep 0.01
-				recursive=${recursive% *}
-				if [[ "$oldrecursive" == "$recursive" ]]; then
-					echo 'unable to interpret'
-					echo
-					return
-				fi
-			fi
 		else
 			before=$recursive\ 
 		fi
@@ -492,7 +492,7 @@ function kb_main() {
 	kb_replace_var
 
 	# for sudo setsid ; etc
-	if [[ "$before" =~ (setsid|sudo|which|whatis|whereis|\||\(|&|\{|;)\ *$ ]]; then
+	if [[ "$before" =~ (setsid| do|sudo|which|whatis|whereis|\||\(|&|\{|;)\ *$ ]]; then
 		kb_menu command "$last"
 		for fill in ${!replaceback[@]}; do
 			var=${replaceback["$fill"]}
@@ -502,11 +502,9 @@ function kb_main() {
 		((READLINE_POINT+=${#prompt} - ${#last}))
 		READLINE_LINE=$before$prompt$READLAST
 		IFS=$' \t\n'
-		((psheight > 1)) && echo -ne "\e[${psheight}A"
-		echo -ne "\r\e[2K"
-		tput smam
-		tput cnorm
-		return
+		((psheight > 1)) && echo -ne "\e[${psheight}A" >&2
+		echo -ne "\r\e[2K" >&2
+		exit
 	fi
 
 	# In the case of completion on 'file.t<tab>
@@ -517,20 +515,5 @@ function kb_main() {
 	kb_menu 'file' "$last"
 	kb_write_prompt "$prompt"
 
-	[[ $nocaseglob ]] || shopt -u nocaseglob
-	[[ $nullglob ]] || shopt -u nullglob
-	[[ $dotglob ]] || shopt -u dotglob
-	[[ $globstar ]] || shopt -s globstar
-
-	((psheight > 0)) && echo -ne "\r\e[2K\e[${psheight}A"
-	echo -ne "\r\e[2K"
-	tput smam
-	tput cnorm
-}
-#bind -x '"\t":kb_main'
-#use this (like in ~/.bashrc after sourcing this file) to group directories first
-#bind -x '"\t":kb_main dirfirst'
-#use this to NOT show help
-bind -x '"\t":kb_main nohelp'
-#Combined
-#bind -x '"\t":kb_main dirfirst nohelp'
+	((psheight > 0)) && echo -ne "\r\e[2K\e[${psheight}A" >&2
+	echo -ne "\r\e[2K" >&2
