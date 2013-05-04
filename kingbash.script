@@ -80,7 +80,9 @@ function kb_menu() {
 	change=1
 	lim=12
 	declare -A lslist
-	tput rmam >&2 #don't wrap long lines
+	#tput rmam >&2 #don't wrap long lines
+	#tmux doesn't support tput rmam, but it does support \e[?7l
+	echo -ne '\e[?7l' >&2
 	IFS=$'\n'
 	prompt="$2"
 
@@ -97,7 +99,7 @@ function kb_menu() {
 		change=0
 		if [[ "$1" == command ]]; then
 			[[ $prompt ]] || { read -sn1 -p "Enter first letter" prompt; echo -ne '\e[2K\r' >&2; }
-			displayres=( $( { compgen -A command -A alias -A builtin -A function $prompt; echo "$customcmd" | grep "^$prompt"; } | sort -u) )
+			displayres=( $( { compgen -A command -A builtin $prompt; echo "$customcmd" | grep "^$prompt"; } | sort -u) )
 			kb_listcheck "$prompt*" executables
 		elif [[ "$1" == file ]]; then
 			colorsw=0
@@ -371,8 +373,8 @@ function kb_output() {
 	echo "$READLINE_POINT"
 }
 
-trap 'echo -n $'\r' >&2; tput smam >&2; tput cnorm >&2; kb_output; exit' EXIT
-trap 'echo -n $'\r' >&2; tput smam >&2; tput cnorm >&2; exit' INT QUIT TERM HUP
+trap 'echo -n $'\r' >&2; echo -ne "\e[?7h" >&2; tput cnorm >&2; kb_output; exit' EXIT
+trap 'echo -n $'\r' >&2; echo -ne "\e[?7h" >&2; tput cnorm >&2; exit' INT QUIT TERM HUP
 
 #function kb_main() {
 	nospace=0

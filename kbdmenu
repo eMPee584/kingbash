@@ -1,6 +1,8 @@
 #! /bin/bash
 in=$(cat)
-tput rmam >&2
+#tput rmam >&2
+#tmux supports \e[7l, but not tput rmam
+echo -ne '\e[?7l' >&2
 tput civis >&2
 Blockon=$'\e[30;47m'
 Blockoff=$'\e[m'
@@ -15,20 +17,24 @@ change=1
 sel=0
 end=0
 
-trap 'tput cnorm >&2; tput smam >&2; exit' EXIT INT QUIT TERM HUP
+trap 'tput cnorm >&2; echo -ne "\e[?7h" >&2; tput smam >&2; stty echo >&2 </dev/tty; exit' EXIT INT QUIT TERM HUP
 
 while ((end==0)); do
 
 ((change==1)) && {
 tempin=$in
+if [[ $pb$pa ]]; then
 display=(
   $(for entry in $(echo "$pb$pa" | tr ' ' '\n'); do
-	tempin=$(echo "$tempin" | fgrep -i "$entry")
+	tempin=$(echo "$tempin" | fgrep -i -- "$entry")
     done
     echo "$tempin" )
 )
 change=0
 sel=0
+else
+readarray -t display <<< "$in"
+fi
 }
 
 total=${#display[@]}
@@ -47,7 +53,7 @@ for ((count = lim *(sel / lim); count < lim+ lim*(sel/lim); count++)); do
 [[ $count == $total && $page == 0 ]] && break || echo $'\e[m' >&2
 ((sel == count)) && echo -n $'\e[46;30m' >&2
 echo -n "${display[$count]}" >&2
-((sel==count)) && for ((colcount=0;colcount<cols;colcount++)); do echo -n '          ' >&2; done
+((sel==count)) && for ((colcount=0;colcount<cols;colcount++)); do echo -n ' ' >&2; done && echo -n $'\e[m' >&2
 done
 
 read -n1 -s key < /dev/tty
